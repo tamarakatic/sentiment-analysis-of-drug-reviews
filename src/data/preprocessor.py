@@ -24,9 +24,9 @@ class Preprocessor:
 
     def clean_data(self):
         new_data_frame = self._data_frame.copy()
-        new_data_frame['review'] = preprocess_data(new_data_frame.iloc[:1, :])
+        new_data_frame['review'] = preprocess_data(new_data_frame.iloc[:, :])
         new_data_frame['rating'] = convert_ratings(new_data_frame['rating'])
-        return new_data_frame.iloc[:1, :]
+        return new_data_frame.iloc[:, :]
 
 
 def load_data(train):
