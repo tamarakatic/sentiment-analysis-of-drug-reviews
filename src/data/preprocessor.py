@@ -6,12 +6,13 @@ from patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
 
 from nltk import pos_tag
 from nltk.corpus import stopwords, wordnet
-from nltk.stem import WordNetLemmatizer
 from nltk.stem.snowball import SnowballStemmer
 from string import punctuation, whitespace
 from spellchecker import SpellChecker
+from tqdm import tqdm
 import language_check
 from pipe import Pipe
+import spacy
 
 
 pd.options.mode.chained_assignment = None
@@ -24,9 +25,9 @@ class Preprocessor:
 
     def clean_data(self):
         new_data_frame = self._data_frame.copy()
-        new_data_frame['review'] = preprocess_data(new_data_frame.iloc[:, :])
+        new_data_frame['review'] = preprocess_data(new_data_frame.iloc[:10, :])
         new_data_frame['rating'] = convert_ratings(new_data_frame['rating'])
-        return new_data_frame.iloc[:, :]
+        return new_data_frame.iloc[:10, :]
 
 
 def load_data(train):
@@ -52,26 +53,27 @@ def convert_ratings(data):
 
 
 def preprocess_data(df):
-    df['review'] = [clean_review(sentence) for sentence in df['review']]
+    df['review'] = [clean_review(sentence) for sentence in tqdm(df['review'])]
     return (df['review'])
 
 
 def clean_review(sentence):
     return sentence \
-        | split_attached_words \
-        | correct_spelling \
-        | correct_grammar \
-        | remove_repeating_vowels \
-        | convert_text_to_lowercase \
-        | remove_digits \
-        | remove_punctuation \
-        | remove_stopwords_and_whitespaces \
-        | remove_emails \
-        | remove_urls \
-        | handle_negations \
-        | replace_emoticons_with_tags \
-        | stem \
         | lemmatize
+    # | split_attached_words \
+    # | correct_spelling \
+    # | correct_grammar \
+    # | remove_repeating_vowels \
+    # | convert_text_to_lowercase \
+    # | remove_digits \
+    # | remove_punctuation \
+    # | remove_stopwords_and_whitespaces \
+    # | remove_emails \
+    # | remove_urls \
+    # | handle_negations \
+    # | replace_emoticons_with_tags \
+    # | stem \
+    # | lemmatize
 
 
 @Pipe
@@ -79,16 +81,20 @@ def split_attached_words(sentence):
     return " ".join(re.findall("[A-Z][^A-Z]*", sentence))
 
 
+SPELL = SpellChecker()
+
+
 @Pipe
 def correct_spelling(sentence):
-    spell = SpellChecker()
-    return " ".join([spell.correction(word) for word in sentence.split()])
+    return " ".join([SPELL.correction(word) for word in sentence.split()])
+
+
+TOOL = language_check.LanguageTool('en-US')
 
 
 @Pipe
 def correct_grammar(sentence):
-    tool = language_check.LanguageTool('en-US')
-    matches = tool.check(sentence)
+    matches = TOOL.check(sentence)
     return language_check.correct(sentence, matches)
 
 
@@ -147,24 +153,18 @@ def replace_emoticons_with_tags(sentence):
     return " ".join([check_emoticons(word) for word in sentence.split()])
 
 
-def get_word_pos(word):
-    tag = pos_tag([word])[0][1][0].upper()
-    tag_dict = {
-        "J": wordnet.ADJ,
-        "N": wordnet.NOUN,
-        "V": wordnet.VERB,
-        "R": wordnet.ADV
-    }
-    return tag_dict.get(tag, wordnet.NOUN)
+STEMMER = SnowballStemmer("english")
 
 
 @Pipe
 def stem(sentence):
-    stemmer = SnowballStemmer("english")
-    return " ".join(stemmer.stem(word) for word in sentence.split())
+    return " ".join(STEMMER.stem(word) for word in sentence.split())
+
+
+SPACY_NLP = spacy.load('en')
 
 
 @Pipe
 def lemmatize(sentence):
-    lemmatizer = WordNetLemmatizer()
-    return " ".join([lemmatizer.lemmatize(word, get_word_pos(word)) for word in sentence.split()])
+    doc = SPACY_NLP(sentence)
+    return " ".join([token.lemma_ for token in doc])
