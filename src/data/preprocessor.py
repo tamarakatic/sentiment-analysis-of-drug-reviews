@@ -4,8 +4,7 @@ import re
 from definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
 from patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
 
-from nltk import pos_tag
-from nltk.corpus import stopwords, wordnet
+from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
 from string import punctuation, whitespace
 from spellchecker import SpellChecker
@@ -59,21 +58,20 @@ def preprocess_data(df):
 
 def clean_review(sentence):
     return sentence \
+        | split_attached_words \
+        | correct_spelling \
+        | correct_grammar \
+        | remove_repeating_vowels \
+        | convert_text_to_lowercase \
+        | remove_digits \
+        | remove_punctuation \
+        | remove_stopwords_and_whitespaces \
+        | remove_emails \
+        | remove_urls \
+        | handle_negations \
+        | replace_emoticons_with_tags \
+        | stem \
         | lemmatize
-    # | split_attached_words \
-    # | correct_spelling \
-    # | correct_grammar \
-    # | remove_repeating_vowels \
-    # | convert_text_to_lowercase \
-    # | remove_digits \
-    # | remove_punctuation \
-    # | remove_stopwords_and_whitespaces \
-    # | remove_emails \
-    # | remove_urls \
-    # | handle_negations \
-    # | replace_emoticons_with_tags \
-    # | stem \
-    # | lemmatize
 
 
 @Pipe
