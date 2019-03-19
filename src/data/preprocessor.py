@@ -1,8 +1,8 @@
 import pandas as pd
 import re
 
-from definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
 from patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
+from definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
 
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
@@ -24,9 +24,9 @@ class Preprocessor:
 
     def clean_data(self):
         new_data_frame = self._data_frame.copy()
-        new_data_frame['review'] = preprocess_data(new_data_frame.iloc[:10, :])
-        new_data_frame['rating'] = convert_ratings(new_data_frame['rating'])
-        return new_data_frame.iloc[:10, :]
+        preprocess_data(new_data_frame)
+        convert_ratings(new_data_frame)
+        return new_data_frame
 
 
 def load_data(train):
@@ -34,33 +34,28 @@ def load_data(train):
     data_frame.rename(columns={'Unnamed: 0': 'Index'}, inplace=True)
     data_frame.fillna("", inplace=True)
     data_frame.drop(['date', 'usefulCount'], axis=1, inplace=True)
-    data_frame.update(data_frame.groupby('drugName')['rating'].mean().reset_index())
     return data_frame
 
 
-def convert_ratings(data):
+def convert_ratings(df):
     ratings = []
-    for rate in data:
+    for rate in df.rating:
         if rate <= 4:
-            ratings.append(1)
-        elif rate > 4 and rate < 7:
             ratings.append(0)
+        elif rate > 4 and rate < 9:
+            ratings.append(1)
         else:
             ratings.append(2)
-
-    return ratings
+    df['rating'] = ratings
 
 
 def preprocess_data(df):
     df['review'] = [clean_review(sentence) for sentence in tqdm(df['review'])]
-    return (df['review'])
 
 
 def clean_review(sentence):
     return sentence \
         | split_attached_words \
-        | correct_spelling \
-        | correct_grammar \
         | remove_repeating_vowels \
         | convert_text_to_lowercase \
         | remove_digits \
@@ -70,8 +65,9 @@ def clean_review(sentence):
         | remove_urls \
         | handle_negations \
         | replace_emoticons_with_tags \
-        | stem \
         | lemmatize
+
+# stem delete
 
 
 @Pipe
@@ -159,7 +155,7 @@ def stem(sentence):
     return " ".join(STEMMER.stem(word) for word in sentence.split())
 
 
-SPACY_NLP = spacy.load('en')
+SPACY_NLP = spacy.load('en', disable=['ner', 'parser'])
 
 
 @Pipe
