@@ -3,8 +3,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-def bag_of_words(classifier, tf_id=False):
-    if tf_id:
+def bag_of_words(classifier, tf_idf=False):
+    if tf_idf:
         steps = [("vect", TfidfVectorizer())]
     else:
         steps = [("vect", CountVectorizer())]
