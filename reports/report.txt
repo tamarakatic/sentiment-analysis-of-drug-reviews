@@ -1,0 +1,118 @@
+Report for Model: BoW + LR is
+	               precision    recall  f1-score   support
+
+    Negative       0.83      0.84      0.83     13357
+     Neutral       0.79      0.65      0.71     13938
+    Positive       0.84      0.91      0.87     25955
+
+   micro avg       0.82      0.82      0.82     53250
+   macro avg       0.82      0.80      0.80     53250
+weighted avg       0.82      0.82      0.82     53250
+
+
+Report for Model: BoW + LR + TFIDF is
+	               precision    recall  f1-score   support
+
+    Negative       0.80      0.73      0.76     13357
+     Neutral       0.69      0.49      0.57     13938
+    Positive       0.75      0.90      0.82     25955
+
+   micro avg       0.75      0.75      0.75     53250
+   macro avg       0.74      0.70      0.72     53250
+weighted avg       0.75      0.75      0.74     53250
+
+
+Report for Model: BoW + MNB is
+	               precision    recall  f1-score   support
+
+    Negative       0.94      0.63      0.75     13357
+     Neutral       0.91      0.51      0.66     13938
+    Positive       0.70      0.99      0.82     25955
+
+   micro avg       0.77      0.77      0.77     53250
+   macro avg       0.85      0.71      0.74     53250
+weighted avg       0.82      0.77      0.76     53250
+
+
+Report for Model: BoW + MNB + TFIDF is
+	               precision    recall  f1-score   support
+
+    Negative       0.99      0.11      0.19     13357
+     Neutral       1.00      0.02      0.04     13938
+    Positive       0.50      1.00      0.67     25955
+
+   micro avg       0.52      0.52      0.52     53250
+   macro avg       0.83      0.38      0.30     53250
+weighted avg       0.76      0.52      0.39     53250
+
+
+Report for Model: BoW + LinearSVC is
+	               precision    recall  f1-score   support
+
+    Negative       0.80      0.82      0.81     13357
+     Neutral       0.74      0.65      0.69     13938
+    Positive       0.83      0.88      0.85     25955
+
+   micro avg       0.80      0.80      0.80     53250
+   macro avg       0.79      0.78      0.79     53250
+weighted avg       0.80      0.80      0.80     53250
+
+
+Report for Model: BoW + LinearSVC + TFIDF is
+	               precision    recall  f1-score   support
+
+    Negative       0.85      0.82      0.83     13357
+     Neutral       0.75      0.68      0.72     13938
+    Positive       0.85      0.90      0.87     25955
+
+   micro avg       0.82      0.82      0.82     53250
+   macro avg       0.82      0.80      0.81     53250
+weighted avg       0.82      0.82      0.82     53250
+
+
+Report for Model: BoW + XGBoost is
+	               precision    recall  f1-score   support
+
+    Negative       0.74      0.71      0.73     13357
+     Neutral       0.64      0.40      0.49     13938
+    Positive       0.73      0.89      0.80     25955
+
+   micro avg       0.72      0.72      0.72     53250
+   macro avg       0.70      0.67      0.67     53250
+weighted avg       0.71      0.72      0.70     53250
+
+
+Report for Model: BoW + XGBoost + TFIDF is
+	               precision    recall  f1-score   support
+
+    Negative       0.74      0.74      0.74     13357
+     Neutral       0.63      0.48      0.54     13938
+    Positive       0.76      0.85      0.80     25955
+
+   micro avg       0.73      0.73      0.73     53250
+   macro avg       0.71      0.69      0.69     53250
+weighted avg       0.72      0.73      0.72     53250
+
+
+Report for Model: BoW + SGDClassifier is
+	               precision    recall  f1-score   support
+
+    Negative       0.81      0.83      0.82     13357
+     Neutral       0.78      0.64      0.70     13938
+    Positive       0.83      0.90      0.86     25955
+
+   micro avg       0.81      0.81      0.81     53250
+   macro avg       0.81      0.79      0.80     53250
+weighted avg       0.81      0.81      0.81     53250
+
+
+Report for Model: BoW + SGDClassifier + TFIDF is
+	               precision    recall  f1-score   support
+
+    Negative       0.73      0.51      0.60     13357
+     Neutral       0.74      0.07      0.13     13938
+    Positive       0.59      0.97      0.73     25955
+
+   micro avg       0.62      0.62      0.62     53250
+   macro avg       0.69      0.52      0.49     53250
+weighted avg       0.66      0.62      0.54     53250
