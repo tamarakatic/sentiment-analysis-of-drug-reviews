@@ -25,7 +25,7 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
         input_mask += padding
         segment_ids += padding
 
-        label_ids = [0, 1, 2]
+        label_ids = [0.0 if idx != example.labels else 1.0]
 
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
