@@ -12,12 +12,12 @@ class MultiLabelDataProcessor(DataProcessor):
         self.labels = None
 
     def get_train_examples(self, data_dir):
-        df_train = pd.read_csv(TRAIN_BERT_PATH).iloc[:10]
+        df_train = pd.read_csv(TRAIN_BERT_PATH)
         df_train.dropna(inplace=True)
         return self.__create_examples(df_train)
 
     def get_dev_examples(self, data_dir):
-        df_dev = pd.read_csv(DEV_BERT_PATH).iloc[:10]
+        df_dev = pd.read_csv(DEV_BERT_PATH)
         df_dev.dropna(inplace=True)
         return self.__create_examples(df_dev)
 
