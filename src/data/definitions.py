@@ -18,3 +18,7 @@ TEST_RAW_PATH = os.path.join(ROOT_PATH, 'data/raw/drugs_test.tsv')
 
 TRAIN_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/drugs_train.csv')
 TEST_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/drugs_test.csv')
+
+OPTION_FILE = os.path.join(ROOT_PATH, 'models/pretrain/elmo/elmo_small_options.json')
+WEIGHT_FILE = os.path.join(
+    ROOT_PATH, 'models/pretrain/elmo/elmo_2x1024_128_2048cnn_1xhighway_weights.hdf5')
