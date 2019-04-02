@@ -1,7 +1,7 @@
 from .input_feature import InputFeatures
 
 
-def convert_examples_to_features(examples, max_seq_length, tokenizer):
+def convert_examples_to_features(examples, max_seq_length, tokenizer, nclasses=3):
     features = []
     classifier = "[CLS]"
     separator = "[SEP]"
@@ -25,7 +25,7 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
         input_mask += padding
         segment_ids += padding
 
-        label_ids = [0.0 if idx != example.labels else 1.0]
+        label_ids = [0.0 if idx != example.labels else 1.0 for idx in range(nclasses)]
 
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
