@@ -44,11 +44,11 @@ def bag_of_words_pipeline():
     )
 
     linear_svc = pipelines.bag_of_words(
-        classifier=LinearSVC(multi_class='ovr', random_state=0, max_iter=2000)
+        classifier=LinearSVC(multi_class='ovr', max_iter=2000, random_state=0)
     )
 
     linear_svc_tfidf = pipelines.bag_of_words(
-        classifier=LinearSVC(multi_class='ovr', random_state=0, max_iter=2000),
+        classifier=LinearSVC(multi_class='ovr', max_iter=2000, random_state=0),
         tf_idf=True
     )
 
