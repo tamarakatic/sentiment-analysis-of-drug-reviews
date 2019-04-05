@@ -10,3 +10,5 @@ seaborn==0.9.0
 spacy==2.0.18
 wordcloud==1.5.0
 allennlp
+torch
+torchvision
