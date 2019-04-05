@@ -1,5 +1,4 @@
 import numpy as np
-from tqdm import tqdm
 from typing import Iterable
 
 import torch
@@ -22,22 +21,34 @@ class ClassifierPredictor:
 
     def __extract_data(self, batch) -> np.ndarray:
         output = self.model(**batch)
-        return (inverse_logit(output["logits"].detach().cpu().numpy()))
+        inv_logits = inverse_logit(output["logits"].detach().cpu().numpy())
+        return inv_logits
 
     def predict(self, dataset: Iterable[Instance]) -> np.ndarray:
         predict_iterator = self.iterator(dataset, num_epochs=1, shuffle=False)
-
         self.model.eval()
 
         predict_result = []
-        predict_tqdm_generator = tqdm(predict_iterator,
-                                      total=self.iterator.get_num_batches(dataset))
 
         with torch.no_grad():
-            for batch in predict_tqdm_generator:
+            for batch in predict_iterator:
                 batch = nn_util.move_to_device(batch, self.cuda_device)
                 predict_result.append(self.__extract_data(batch))
         return np.concatenate(predict_result, axis=0)
+
+    def evaluate(self, dataset):
+        eval_iterator = self.iterator(dataset, num_epochs=1, shuffle=False)
+        self.model.eval()
+
+        eval_result = []
+
+        with torch.no_grad():
+            for batch in eval_iterator:
+                batch = nn_util.move_to_device(batch, self.cuda_device)
+                eval_result.append(self.__extract_data(batch))
+                import ipdb
+                ipdb.set_trace()  # XXX Breakpoint
+        return np.concatenate(eval_result, axis=0)
 
 
 def inverse_logit(p):

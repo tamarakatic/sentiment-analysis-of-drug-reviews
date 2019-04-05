@@ -15,17 +15,20 @@ def spacy_tokenizer(sentence: str):
     return [w.text for w in list_of_tokens]
 
 
-def dataset_reader():
+def dataset_reader(train=True):
     token_indexer = ELMoTokenCharactersIndexer()
     reader = ElmoDatasetReader(
         tokenizer=spacy_tokenizer,
         token_indexers={"tokens": token_indexer}
     )
 
-    train_dataset = reader.read(TRAIN_BERT_PATH)
-    dev_dataset = reader.read(DEV_BERT_PATH)
-    test_dataset = reader.read(TEST_BERT_PATH)
-    return train_dataset, dev_dataset, test_dataset
+    if train:
+        train_dataset = reader.read(TRAIN_BERT_PATH)
+        dev_dataset = reader.read(DEV_BERT_PATH)
+        return train_dataset, dev_dataset
+    else:
+        test_dataset = reader.read(TEST_BERT_PATH)
+        return test_dataset
 
 
 def data_iterator(vocabulary):
@@ -33,5 +36,4 @@ def data_iterator(vocabulary):
                               sorting_keys=[("tokens", "num_tokens")])
 
     iterator.index_with(vocabulary)
-
     return iterator
