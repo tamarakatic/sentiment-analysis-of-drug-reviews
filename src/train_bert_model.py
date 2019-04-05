@@ -1,13 +1,13 @@
 import os
+from pprint import pprint
 import numpy as np
-import pandas as pd
 import random
-from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm
 
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, f1_score
 
-from data.definitions import DATA_BERT_PATH, BERT_PRETRAINED_PATH
-from data.definitions import DATA_BERT, PRETRAINED_BERT_CACHE
+from data.definitions import DATA_BERT_PATH
+from data.definitions import DATA_BERT, OUTPUT_BERT_DIR, PRETRAINED_BERT_CACHE
 
 from bert.multilabel_data_processor import MultiLabelDataProcessor
 from bert.cyclic_learning_rate import CyclicLR
@@ -29,8 +29,9 @@ args = {
     "data_dir": DATA_BERT,
     "full_data_dir": DATA_BERT_PATH,
     "task_name": "sentiment_analysis",
-    "no_cuda": False,
-    "bert_model": BERT_PRETRAINED_PATH,
+    "no_cuda": True,
+    "bert_model": "bert-base-uncased",
+    "output_dir": OUTPUT_BERT_DIR,
     "max_seq_length": 128,
     "do_train": True,
     "do_eval": True,
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
-        all_label_ids = torch.tensor([f.label_ids for f in eval_features], dtype=torch.long)
+        all_label_ids = torch.tensor([f.label_ids for f in eval_features], dtype=torch.float)
 
         eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
         eval_sampler = SequentialSampler(eval_data)
@@ -233,10 +234,6 @@ if __name__ == "__main__":
                   'eval_accuracy': eval_accuracy,
                   'roc_auc': roc_auc}
 
-        with open("../reports/bert_eval_results.txt", "w") as tf:
-            for key in sorted(result.keys()):
-                tf.write("{} = {}\n".format(key, str(result[key])))
-
         return result
 
     trian_features = convert_examples_to_features(
@@ -245,7 +242,7 @@ if __name__ == "__main__":
     all_input_ids = torch.tensor([f.input_ids for f in trian_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in trian_features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in trian_features], dtype=torch.long)
-    all_label_ids = torch.tensor([f.label_ids for f in trian_features], dtype=torch.long)
+    all_label_ids = torch.tensor([f.label_ids for f in trian_features], dtype=torch.float)
 
     train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
 
@@ -274,7 +271,9 @@ if __name__ == "__main__":
         global_step = 0
         model.train()
 
-        for i_ in tqdm(range(int(num_epochs)), desc="Epoch"):
+        for i_ in range(int(num_epochs)):
+            print("\nEpoch: {}".format(i_))
+
             tr_loss = 0
             nb_train_examples = 0
             nb_train_steps = 0
@@ -310,9 +309,10 @@ if __name__ == "__main__":
                     optimizer.zero_grad()
                     global_step += 1
 
-            eval()
+            eval_results = eval()
+            pprint(eval_results)
 
-    model.module.BertForMultiLabelSequenceClassification.unfreeze_bert_encoder()
+    model.unfreeze_bert_encoder()
 
     fit()
 
@@ -325,19 +325,17 @@ if __name__ == "__main__":
         args["bert_model"], num_labels=num_labels, state_dict=model_state_dict)
     model.to(device)
 
-    model
+    eval_results = eval()
+    with open("reports/bert_train_eval.txt", "w") as fp:
+        pprint(eval_results, fp)
 
-    eval()
-
-    def predict(model):
+    def evaluate_model(model):
         predict_processor = MultiLabelDataProcessor(DATA_BERT_PATH)
         test_filename = "test.csv"
         test_examples = predict_processor.get_test_examples(DATA_BERT_PATH, test_filename)
 
-        input_data = [{'id': input_example.guid, 'review': input_example.text_a}
-                      for input_example in test_examples]
-
         all_logits = None
+        all_labels = None
 
         test_features = convert_examples_to_features(
             test_examples, args['max_seq_length'], tokenizer)
@@ -345,23 +343,24 @@ if __name__ == "__main__":
         all_input_ids = torch.tensor([f.input_ids for f in test_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in test_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in test_features], dtype=torch.long)
+        all_label_ids = torch.tensor([f.label_ids for f in test_features], dtype=torch.float)
 
-        test_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids)
+        test_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
         test_sampler = SequentialSampler(test_data)
         test_dataloader = DataLoader(test_data,
                                      sampler=test_sampler,
                                      batch_size=args["eval_batch_size"])
-
         model.eval()
 
         nb_eval_steps = 0
         nb_eval_examples = 0
 
         for step, batch in enumerate(tqdm(test_dataloader, desc="Prediction Iteration")):
-            input_ids, input_mask, segment_ids = batch
+            input_ids, input_mask, segment_ids, label_ids = batch
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
             segment_ids = segment_ids.to(device)
+            label_ids = label_ids.to(device)
 
             with torch.no_grad():
                 logits = model(input_ids, segment_ids, input_mask)
@@ -372,12 +371,37 @@ if __name__ == "__main__":
             else:
                 all_logits = np.concatenate((all_logits, logits.detach().cpu().numpy()), axis=0)
 
+            if all_labels is None:
+                all_labels = label_ids.detach().cpu().numpy()
+            else:
+                all_labels = np.concatenate((all_labels, label_ids.detach().cpu().numpy()), axis=0)
+
             nb_eval_examples += input_ids.size(0)
             nb_eval_steps += 1
 
-        return pd.merge(pd.DataFrame(input_data), pd.DataFrame(all_logits, columns=label_list),
-                        left_index=True, right_index=True)
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
 
-    result = predict(model)
-    cols = ["Index", "drugName", "condition", "review", "rating"]
-    result[cols].to_csv(DATA_BERT_PATH/'drugs_sentiment_analysis_bert.csv', index=None)
+        for i in range(num_labels):
+            fpr[i], tpr[i], _ = roc_curve(all_labels[:, i], all_logits[:, i])
+            roc_auc[i] = auc(fpr[i], tpr[i])
+
+        # Compute micro-average ROC curve and ROC area
+        fpr["micro"], tpr["micro"], _ = roc_curve(all_labels.ravel(), all_logits.ravel())
+        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+        f1 = {}
+        for average in ["micro", "macro", "weighted"]:
+            f1[average] = f1_score(all_labels.argmax(axis=1),
+                                   all_logits.argmax(axis=1),
+                                   average=average)
+
+        result = {'roc_auc': roc_auc, 'f1': f1}
+        return result
+
+    final_results = evaluate_model(model)
+    print('\n\nFinal Results:\n')
+    pprint(final_results)
+    with open("reports/bert_final_results.txt", "w") as fp:
+        pprint(final_results, fp)
