@@ -5,6 +5,7 @@ from allennlp.nn.util import get_text_field_mask
 from allennlp.modules.text_field_embedders import TextFieldEmbedder
 from allennlp.modules.seq2vec_encoders import Seq2VecEncoder
 from allennlp.data.vocabulary import Vocabulary
+from allennlp.training.metrics import CategoricalAccuracy
 
 import torch
 
@@ -22,6 +23,7 @@ class BaseModel(Model):
         self.encoder = encoder
         self.linear = torch.nn.Linear(in_features=self.encoder.get_output_dim(),
                                       out_features=output)
+        self.accuracy = CategoricalAccuracy()
         self.loss = torch.nn.BCEWithLogitsLoss()
 
     def forward(self,
@@ -33,6 +35,10 @@ class BaseModel(Model):
         encoder_out = self.encoder(embeddings, mask)
         logits = self.linear(encoder_out)
         output = {"logits": logits}
+        self.accuracy(logits, label)
         output["loss"] = self.loss(logits, label)
 
         return output
+
+    def get_metrics(self, reset: bool = False) -> Dict[str, float]:
+        return {'accuracy': self.accuracy.get_metric(reset)}
