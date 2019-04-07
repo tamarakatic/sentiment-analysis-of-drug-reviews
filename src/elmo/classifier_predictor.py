@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 from typing import Iterable
 
 import torch
@@ -43,18 +44,15 @@ class ClassifierPredictor:
         eval_result = []
 
         with torch.no_grad():
-            for batch in eval_iterator:
-                batch = nn_util.move_to_device(batch, self.cuda_device)
+            for batch in tqdm(eval_iterator, total=self.iterator.get_num_batches(dataset)):
                 eval_result.append(self.__extract_data(batch))
-                import ipdb
-                ipdb.set_trace()  # XXX Breakpoint
         return np.concatenate(eval_result, axis=0)
 
 
 def inverse_logit(p):
-    if p > 0:
-        return 1. / (1. + np.exp(-p))
-    elif p <= 0:
-        np.exp(p) / (1 + np.exp(p))
-    else:
-        raise ValueError
+    pos_ids = p > 0
+    neg_ids = p <= 0
+    sigmoids = np.zeros(p.shape)
+    sigmoids[pos_ids] = 1.0 / (1.0 + np.exp(-p[pos_ids]))
+    sigmoids[neg_ids] = np.exp(p[neg_ids]) / (1.0 + np.exp(p[neg_ids]))
+    return sigmoids

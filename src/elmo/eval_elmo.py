@@ -1,15 +1,18 @@
 import os
 import torch
 from data.definitions import OPTION_FILE, WEIGHT_FILE, PRETRAINED_ELMO
-from elmo.prepare_elmo_data import dataset_reader
-from elmo.classifier_predictor import ClassifierPredictor
+from prepare_elmo_data import dataset_reader
+from classifier_predictor import ClassifierPredictor
 
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.modules.token_embedders import ElmoTokenEmbedder
 from allennlp.modules.seq2vec_encoders import PytorchSeq2VecWrapper
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.data.iterators import BasicIterator
-from elmo.base_model import BaseModel
+from base_model import BaseModel
+
+import pandas as pd
+from sklearn import metrics
 
 HIDDEN_DIM = 128
 BATCH_SIZE = 32
@@ -46,4 +49,15 @@ if __name__ == '__main__':
 
     cuda_device = -1
     predictor = ClassifierPredictor(model, basic_iterator, cuda_device=cuda_device)
-    predictor.evaluate(test_dataset)
+    eval_results = predictor.evaluate(test_dataset)
+
+    y_true = [example['label'].array.argmax() for example in test_dataset]
+    y_pred = eval_results.argmax(axis=1).tolist()
+
+    f1_report = {}
+    for average in ['micro', 'macro', 'weighted']:
+        f1 = metrics.f1_score(y_true, y_pred, average=average)
+        f1_report['f1_{}'.format(average)] = f1
+
+    df = pd.DataFrame(f1_report)
+    df.to_csv('../reports/elmo_report.csv', index=False)

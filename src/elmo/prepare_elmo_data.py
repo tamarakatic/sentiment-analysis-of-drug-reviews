@@ -1,5 +1,5 @@
 from elmo.dataset_reader import ElmoDatasetReader
-from data.definitions import DEV_BERT_PATH, TRAIN_BERT_PATH, TEST_BERT_PATH
+from data.definitions import TEST_PROCESSED_PATH, TRAIN_PROCESSED_PATH, DEV_PROCESSED_PATH
 
 from allennlp.data.token_indexers.elmo_indexer import ELMoTokenCharactersIndexer
 from allennlp.data.tokenizers.word_splitter import SpacyWordSplitter
@@ -23,11 +23,11 @@ def dataset_reader(train=True):
     )
 
     if train:
-        train_dataset = reader.read(TRAIN_BERT_PATH)
-        dev_dataset = reader.read(DEV_BERT_PATH)
+        train_dataset = reader.read(TRAIN_PROCESSED_PATH)
+        dev_dataset = reader.read(DEV_PROCESSED_PATH)
         return train_dataset, dev_dataset
     else:
-        test_dataset = reader.read(TEST_BERT_PATH)
+        test_dataset = reader.read(TEST_PROCESSED_PATH)
         return test_dataset
 
 

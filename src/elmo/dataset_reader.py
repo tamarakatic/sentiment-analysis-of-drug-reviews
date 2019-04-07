@@ -37,17 +37,19 @@ class ElmoDatasetReader(DatasetReader):
         id_field = MetadataField(idx)
         fields["id"] = id_field
 
-        label_field = [0 if label != idx else 1 for idx in range(nclasses)]
+        label_field = np.array([0 if label != idx else 1 for idx in range(nclasses)])
         fields["label"] = ArrayField(array=label_field)
 
         return Instance(fields)
 
     def _read(self, file_path: str) -> Iterator[Instance]:
         df = pd.read_csv(file_path)
+        df.dropna(inplace=True)
 
         for (i, row) in df.iterrows():
+            review = '{} {}'.format(row.condition, row.review)
             yield self.text_to_instance(
-                [Token(x) for x in self.tokenizer(row["review"])],
+                [Token(x) for x in self.tokenizer(review)],
                 row["Index"],
                 row["rating"],
                 len(CLASSES)
