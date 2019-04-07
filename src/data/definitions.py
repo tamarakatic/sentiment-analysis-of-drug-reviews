@@ -18,8 +18,9 @@ TEST_BERT_PATH = os.path.join(ROOT_PATH, 'data/bert/test.csv')
 TRAIN_RAW_PATH = os.path.join(ROOT_PATH, 'data/raw/drugs_train.tsv')
 TEST_RAW_PATH = os.path.join(ROOT_PATH, 'data/raw/drugs_test.tsv')
 
-TRAIN_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/drugs_train.csv')
-TEST_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/drugs_test.csv')
+TRAIN_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/train.csv')
+TEST_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/test.csv')
+DEV_PROCESSED_PATH = os.path.join(ROOT_PATH, 'data/processed/dev.csv')
 
 OPTION_FILE = os.path.join(ROOT_PATH, 'models/pretrain/elmo/elmo_small_options.json')
 WEIGHT_FILE = os.path.join(
