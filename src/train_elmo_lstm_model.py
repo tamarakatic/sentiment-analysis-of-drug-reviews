@@ -15,7 +15,7 @@ from allennlp.data.vocabulary import Vocabulary
 HIDDEN_DIM = 128
 SEED = 42
 LEARNING_RATE = 3e-4
-EPOCHS = 6
+EPOCHS = 20
 BATCH_SIZE = 32
 
 
@@ -53,7 +53,7 @@ def main():
         validation_dataset=dev_dataset,
         cuda_device=0 if cuda_gpu else -1,
         num_epochs=EPOCHS,
-        patience=3
+        patience=5
     )
 
     trainer.train()
