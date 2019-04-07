@@ -1,8 +1,8 @@
 import pandas as pd
 import re
 
-from .patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
-from .definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
+from patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
+from definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
 
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
@@ -19,12 +19,13 @@ pd.options.mode.chained_assignment = None
 
 class Preprocessor:
 
-    def __init__(self, train=True):
+    def __init__(self, train=True, dl=False):
         self._data_frame = load_data(train)
+        self.dl = dl
 
     def clean_data(self):
         new_data_frame = self._data_frame.copy()
-        preprocess_data(new_data_frame)
+        preprocess_data(new_data_frame, self.dl)
         convert_ratings(new_data_frame)
         return new_data_frame
 
@@ -49,24 +50,33 @@ def convert_ratings(df):
     df['rating'] = ratings
 
 
-def preprocess_data(df):
-    df['review'] = [clean_review(sentence) for sentence in tqdm(df['review'])]
+def preprocess_data(df, dl):
+    df['review'] = [clean_review(sentence, dl) for sentence in tqdm(df['review'])]
 
 
-def clean_review(sentence):
-    return sentence \
-        | split_attached_words \
-        | remove_repeating_vowels \
-        | convert_text_to_lowercase \
-        | remove_digits \
-        | remove_punctuation \
-        | remove_stopwords_and_whitespaces \
-        | remove_emails \
-        | remove_urls \
-        | handle_negations \
-        | replace_emoticons_with_tags \
-        | stem \
-        | lemmatize
+def clean_review(sentence, dl):
+    if dl:
+        return sentence \
+            | remove_repeating_vowels \
+            | convert_text_to_lowercase \
+            | remove_digits \
+            | remove_emails \
+            | remove_urls \
+            | replace_emoticons_with_tags
+    else:
+        return sentence \
+            | split_attached_words \
+            | remove_repeating_vowels \
+            | convert_text_to_lowercase \
+            | remove_digits \
+            | remove_punctuation \
+            | remove_stopwords_and_whitespaces \
+            | remove_emails \
+            | remove_urls \
+            | handle_negations \
+            | replace_emoticons_with_tags \
+            | stem \
+            | lemmatize
 
 
 @Pipe

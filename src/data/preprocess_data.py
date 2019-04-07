@@ -12,7 +12,7 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    preprocess = preprocessor.Preprocessor(train=args.train)
+    preprocess = preprocessor.Preprocessor(train=args.train, dl=False)
     preprocess_data = preprocess.clean_data()
     path = TRAIN_PROCESSED_PATH if args.train else TEST_PROCESSED_PATH
     preprocess_data.to_csv(path, encoding='utf-8', index=False)
