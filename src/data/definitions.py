@@ -10,6 +10,7 @@ BERT_PRETRAINED_PATH = os.path.join(ROOT_PATH, 'models/pretrain/uncased_L-12_H-7
 PRETRAINED_BERT_CACHE = os.path.join(ROOT_PATH, 'models/pretrain/uncased_L-12_H-768_A-12/cache/')
 
 PRETRAINED_ELMO = os.path.join(ROOT_PATH, 'models/pretrain/elmo/')
+PRETRAINED_BERT = os.path.join(ROOT_PATH, 'models/pretrain/bert/')
 
 DEV_BERT_PATH = os.path.join(ROOT_PATH, 'data/bert/dev.csv')
 TRAIN_BERT_PATH = os.path.join(ROOT_PATH, 'data/bert/train.csv')
