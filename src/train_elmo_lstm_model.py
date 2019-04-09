@@ -1,13 +1,13 @@
 import os
 
 from data.definitions import OPTION_FILE, WEIGHT_FILE, PRETRAINED_ELMO
-from elmo.prepare_elmo_data import data_iterator, dataset_reader
-from elmo.base_model import BaseModel
+from prepare_allennlp_data import data_iterator, dataset_reader
+from tl_allennlp.base_model import BaseModel
 
 import torch
 
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
-from allennlp.modules.token_embedders import ElmoTokenEmbedder
+from allennlp.modules.token_embedders.elmo_token_embedder import ElmoTokenEmbedder
 from allennlp.modules.seq2vec_encoders import PytorchSeq2VecWrapper
 from allennlp.training.trainer import Trainer
 from allennlp.data.vocabulary import Vocabulary
@@ -23,8 +23,8 @@ def main():
     cuda_gpu = torch.cuda.is_available()
     torch.manual_seed(SEED)
 
-    elmo_embedders = ElmoTokenEmbedder(OPTION_FILE, WEIGHT_FILE)
-    word_embeddings = BasicTextFieldEmbedder({"tokens": elmo_embedders})
+    elmo_embedder = ElmoTokenEmbedder(OPTION_FILE, WEIGHT_FILE)
+    word_embeddings = BasicTextFieldEmbedder({"tokens": elmo_embedder})
 
     encoder = PytorchSeq2VecWrapper(
         torch.nn.LSTM(word_embeddings.get_output_dim(),
@@ -33,16 +33,16 @@ def main():
                       batch_first=True)
     )
 
-    train_dataset, dev_dataset = dataset_reader()
-    vocabulary = Vocabulary()
+    train_dataset, dev_dataset = dataset_reader(train=True, elmo=True)
+    vocab = Vocabulary()
 
     model = BaseModel(word_embeddings=word_embeddings,
                       encoder=encoder,
-                      vocabulary=vocabulary)
+                      vocabulary=vocab)
 
     model.cuda() if cuda_gpu else model
 
-    iterator = data_iterator(vocabulary)
+    iterator = data_iterator(vocab)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     trainer = Trainer(
