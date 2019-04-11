@@ -1,8 +1,8 @@
 import pandas as pd
 import re
 
-from patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
-from definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
+from .patterns import NEGATIVE_CONSTRUCTS, POSITIVE_EMOTICONS, NEGATIVE_EMOTICONS
+from .definitions import TRAIN_RAW_PATH, TEST_RAW_PATH
 
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
