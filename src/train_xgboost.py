@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
 from sklearn.feature_extraction.text import CountVectorizer
 from xgboost.sklearn import XGBClassifier
-from data.definitions import TRAIN_PROCESSED_PATH, TEST_PROCESSED_PATH
+from data.definitions import TRAIN_PATH, TEST_PATH
 
 
 pipeline = Pipeline([
@@ -23,7 +23,7 @@ params = {
 }
 
 if __name__ == "__main__":
-    preprocess_data = pd.read_csv(TRAIN_PROCESSED_PATH)
+    preprocess_data = pd.read_csv(TRAIN_PATH)
     preprocess_data.dropna(inplace=True)
     samples, labels = preprocess_data['review'], preprocess_data['rating']
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     pipeline.fit(X_train, y_train)
 
     print("Validation model\n")
-    test_df = pd.read_csv(TEST_PROCESSED_PATH)
+    test_df = pd.read_csv(TEST_PATH)
     test_df.dropna(inplace=True)
     X_test, y_test = test_df['review'], test_df['rating']
 

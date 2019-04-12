@@ -11,7 +11,7 @@ from sklearn.svm import LinearSVC
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import SGDClassifier
-from data.definitions import TRAIN_PROCESSED_PATH, TEST_PROCESSED_PATH
+from data.definitions import TRAIN_PATH, TEST_PATH
 
 joblib_model = "../models/finilized_model.pkl"
 
@@ -97,11 +97,11 @@ def bag_of_words_pipeline():
 
 
 if __name__ == "__main__":
-    preprocess_data = pd.read_csv(TRAIN_PROCESSED_PATH)
+    preprocess_data = pd.read_csv(TRAIN_PATH)
     preprocess_data.dropna(inplace=True)
     samples, labels = preprocess_data['review'], preprocess_data['rating']
 
-    test_df = pd.read_csv(TEST_PROCESSED_PATH)
+    test_df = pd.read_csv(TEST_PATH)
     test_df.dropna(inplace=True)
 
     X_test, y_test = test_df['review'], test_df['rating']

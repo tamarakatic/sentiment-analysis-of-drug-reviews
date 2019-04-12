@@ -8,9 +8,9 @@ from prepare_allennlp_data import dataset_reader
 from tl_allennlp.base_model import BaseModel
 from tl_allennlp.definitions import PRETRAINED_BERT
 from tl_allennlp.classifier_predictor import ClassifierPredictor
+from tl_allennlp.bert_encoder import BertSentencePooler
 
 from allennlp.data.vocabulary import Vocabulary
-from allennlp.modules.seq2vec_encoders import Seq2VecEncoder
 from allennlp.modules.token_embedders.bert_token_embedder import PretrainedBertEmbedder
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.data.iterators import BasicIterator
@@ -24,16 +24,6 @@ BERT_EMBEDDER = PretrainedBertEmbedder(
 )
 WORD_EMBEDDINGS = BasicTextFieldEmbedder({"tokens": BERT_EMBEDDER},
                                          allow_unmatched_keys=True)
-
-
-class BertSentencePooler(Seq2VecEncoder):
-    def forward(self,
-                embs: torch.tensor,
-                mask: torch.tensor=None) -> torch.tensor:
-        return embs[:, 0]
-
-    def get_output_dim(self) -> int:
-        return WORD_EMBEDDINGS.get_output_dim()
 
 
 def load_bert_model():
@@ -51,7 +41,8 @@ def load_bert_model():
 
 
 if __name__ == '__main__':
-    cuda_gpu = torch.cuda.is_available()
+    cuda_device = -1
+
     model = load_bert_model()
 
     test_dataset = dataset_reader(train=False, elmo=False)
@@ -59,7 +50,11 @@ if __name__ == '__main__':
     basic_iterator = BasicIterator(batch_size=BATCH_SIZE)
     basic_iterator.index_with(model.vocab)
 
-    predictor = ClassifierPredictor(model, basic_iterator, cuda_device=0 if cuda_gpu else -1)
+    if torch.cuda.is_available():
+        cuda_device = 0
+        model = model.cuda(cuda_device)
+
+    predictor = ClassifierPredictor(model, basic_iterator, cuda_device=cuda_device)
     eval_results = predictor.evaluate(test_dataset)
 
     y_true = [row['label'].array.argmax() for row in test_dataset]

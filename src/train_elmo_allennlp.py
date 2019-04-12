@@ -14,19 +14,20 @@ from allennlp.data.vocabulary import Vocabulary
 
 HIDDEN_DIM = 128
 SEED = 42
-LEARNING_RATE = 3e-4
-EPOCHS = 20
-BATCH_SIZE = 32
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-5
+EPOCHS = 50
 
 
 def main():
-    cuda_gpu = torch.cuda.is_available()
+    cuda_device = -1
+
     torch.manual_seed(SEED)
 
     elmo_embedder = ElmoTokenEmbedder(OPTION_FILE, WEIGHT_FILE)
     word_embeddings = BasicTextFieldEmbedder({"tokens": elmo_embedder})
 
-    encoder = PytorchSeq2VecWrapper(
+    lstm = PytorchSeq2VecWrapper(
         torch.nn.LSTM(word_embeddings.get_output_dim(),
                       HIDDEN_DIM,
                       bidirectional=True,
@@ -37,13 +38,15 @@ def main():
     vocab = Vocabulary()
 
     model = BaseModel(word_embeddings=word_embeddings,
-                      encoder=encoder,
+                      encoder=lstm,
                       vocabulary=vocab)
 
-    model.cuda() if cuda_gpu else model
+    if torch.cuda.is_available():
+        cuda_device = 0
+        model = model.cuda(cuda_device)
 
     iterator = data_iterator(vocab)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
     trainer = Trainer(
         model=model,
@@ -51,7 +54,7 @@ def main():
         iterator=iterator,
         train_dataset=train_dataset,
         validation_dataset=dev_dataset,
-        cuda_device=0 if cuda_gpu else -1,
+        cuda_device=cuda_device,
         num_epochs=EPOCHS,
         patience=5
     )

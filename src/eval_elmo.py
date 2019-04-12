@@ -41,17 +41,22 @@ def load_elmo_model():
 
 
 if __name__ == '__main__':
+    cuda_device = -1
+
     model = load_elmo_model()
     test_dataset = dataset_reader(train=False, elmo=True)
 
     basic_iterator = BasicIterator(batch_size=BATCH_SIZE)
     basic_iterator.index_with(model.vocab)
 
-    cuda_device = -1
+    if torch.cuda.is_available():
+        cuda_device = 0
+        model = model.cuda(cuda_device)
+
     predictor = ClassifierPredictor(model, basic_iterator, cuda_device=cuda_device)
     eval_results = predictor.evaluate(test_dataset)
 
-    y_true = [example['label'].array.argmax() for example in test_dataset]
+    y_true = [row['label'].array.argmax() for row in test_dataset]
     y_pred = eval_results.argmax(axis=1).tolist()
 
     f1_report = {}

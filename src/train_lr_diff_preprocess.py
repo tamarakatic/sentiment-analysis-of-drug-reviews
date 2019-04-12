@@ -27,14 +27,14 @@ def bag_of_words_pipeline():
 
 
 if __name__ == "__main__":
-    options = "remove_repeating_vowels"
-    train_df = preprocessor.Preprocessor(train=True)
+    options = "convert_text_to_lowercase"
+    train_df = preprocessor.Preprocessor(train=True, dl=False)
     train_df = train_df.clean_data()
     train_df.dropna(inplace=True)
 
     samples, labels = train_df['review'], train_df['rating']
 
-    test_df = preprocessor.Preprocessor(train=False)
+    test_df = preprocessor.Preprocessor(train=False, dl=False)
     test_df = test_df.clean_data()
     test_df.dropna(inplace=True)
 

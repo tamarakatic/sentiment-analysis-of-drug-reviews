@@ -4,54 +4,48 @@ import torch
 from prepare_allennlp_data import data_iterator, dataset_reader
 from tl_allennlp.base_model import BaseModel
 from tl_allennlp.definitions import PRETRAINED_BERT
+from tl_allennlp.bert_encoder import BertSentencePooler
 
 from allennlp.data.vocabulary import Vocabulary
-from allennlp.modules.seq2vec_encoders import Seq2VecEncoder
 from allennlp.modules.token_embedders.bert_token_embedder import PretrainedBertEmbedder
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.training.trainer import Trainer
 
 HIDDEN_DIM = 128
 SEED = 42
-LEARNING_RATE = 3e-4
-EPOCHS = 20
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-3
+EPOCHS = 30
 BATCH_SIZE = 32
-
-BERT_EMBEDDER = PretrainedBertEmbedder(
-    pretrained_model="bert-base-uncased",
-    top_layer_only=True
-)
-WORD_EMBEDDINGS = BasicTextFieldEmbedder({"tokens": BERT_EMBEDDER},
-                                         allow_unmatched_keys=True)
-
-
-class BertSentencePooler(Seq2VecEncoder):
-    def forward(self,
-                embs: torch.tensor,
-                mask: torch.tensor=None) -> torch.tensor:
-        return embs[:, 0]
-
-    def get_output_dim(self) -> int:
-        return WORD_EMBEDDINGS.get_output_dim()
 
 
 def main():
-    cuda_gpu = torch.cuda.is_available()
+    cuda_device = -1
+
     torch.manual_seed(SEED)
+
+    bert_embedder = PretrainedBertEmbedder(
+        pretrained_model="bert-base-uncased",
+        top_layer_only=True
+    )
+    word_embedding = BasicTextFieldEmbedder({"tokens": bert_embedder},
+                                            allow_unmatched_keys=True)
 
     train_dataset, dev_dataset = dataset_reader(train=True, elmo=False)
     vocab = Vocabulary()
 
     encoder = BertSentencePooler(vocab)
 
-    model = BaseModel(word_embeddings=WORD_EMBEDDINGS,
+    model = BaseModel(word_embeddings=word_embedding,
                       encoder=encoder,
                       vocabulary=vocab)
 
-    model.cuda() if cuda_gpu else model
+    if torch.cuda.is_available():
+        cuda_device = 0
+        model = model.cuda(cuda_device)
 
     iterator = data_iterator(vocab)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
     trainer = Trainer(
         model=model,
@@ -59,7 +53,7 @@ def main():
         iterator=iterator,
         train_dataset=train_dataset,
         validation_dataset=dev_dataset,
-        cuda_device=0 if cuda_gpu else -1,
+        cuda_device=cuda_device,
         num_epochs=EPOCHS,
         patience=5
     )

@@ -1,5 +1,5 @@
 from tl_allennlp.dataset_reader import TransferLearnDatasetReader
-from data.definitions import TEST_PROCESSED_PATH, TRAIN_PROCESSED_PATH, DEV_PROCESSED_PATH
+from data.definitions import TEST_PATH, TRAIN_PATH, DEV_PATH
 
 from allennlp.data.token_indexers.elmo_indexer import ELMoTokenCharactersIndexer
 from allennlp.data.token_indexers.wordpiece_indexer import PretrainedBertIndexer
@@ -44,11 +44,11 @@ def dataset_reader(train=True, elmo=True):
         )
 
     if train:
-        train_dataset = reader.read(TRAIN_PROCESSED_PATH)
-        dev_dataset = reader.read(DEV_PROCESSED_PATH)
+        train_dataset = reader.read(TRAIN_PATH)
+        dev_dataset = reader.read(DEV_PATH)
         return train_dataset, dev_dataset
     else:
-        test_dataset = reader.read(TEST_PROCESSED_PATH)
+        test_dataset = reader.read(TEST_PATH)
         return test_dataset
 
 
