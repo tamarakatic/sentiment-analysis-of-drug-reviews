@@ -1,5 +1,7 @@
 import os
 import torch
+from collections import defaultdict
+
 from data.definitions import OPTION_FILE, WEIGHT_FILE, PRETRAINED_ELMO
 from prepare_allennlp_data import dataset_reader
 from tl_allennlp.classifier_predictor import ClassifierPredictor
@@ -59,10 +61,11 @@ if __name__ == '__main__':
     y_true = [row['label'].array.argmax() for row in test_dataset]
     y_pred = eval_results.argmax(axis=1).tolist()
 
-    f1_report = {}
+    f1_report = defaultdict(list)
     for average in ['micro', 'macro', 'weighted']:
         f1 = metrics.f1_score(y_true, y_pred, average=average)
-        f1_report['f1_{}'.format(average)] = f1
+        f1_report['f1_{}'.format(average)].append(f1)
 
+    print("******************Elmo Report***************\n{}".format(f1_report))
     df = pd.DataFrame(f1_report)
     df.to_csv('../reports/elmo_report.csv', index=False)

@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from sklearn import metrics
+from collections import defaultdict
 
 import torch
 
@@ -60,10 +61,11 @@ if __name__ == '__main__':
     y_true = [row['label'].array.argmax() for row in test_dataset]
     y_pred = eval_results.argmax(axis=1).tolist()
 
-    f1_report = {}
+    f1_report = defaultdict(list)
     for average in ['micro', 'macro', 'weighted']:
         f1 = metrics.f1f1_score(y_pred, y_true, average=average)
-        f1_report['f1_{}'.format(average)] = f1
+        f1_report['f1_{}'.format(average)].append(f1)
 
+    print("******************Bert Report***************\n{}".format(f1_report))
     df = pd.DataFrame(f1_report)
     df.to_csv('../reports/bert_report.csv', index=False)
