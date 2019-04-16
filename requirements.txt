@@ -12,3 +12,4 @@ wordcloud==1.5.0
 allennlp
 torch
 torchvision
+flair
