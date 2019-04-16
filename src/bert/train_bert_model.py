@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from sklearn.metrics import roc_curve, auc, f1_score
 
-from data.definitions import DATA_BERT_PATH
+from data.definitions import DATA_PATH
 from data.definitions import DATA_BERT, OUTPUT_BERT_DIR, PRETRAINED_BERT_CACHE
 
 from bert.multilabel_data_processor import MultiLabelDataProcessor
@@ -27,7 +27,7 @@ model_state_dict = None
 
 args = {
     "data_dir": DATA_BERT,
-    "full_data_dir": DATA_BERT_PATH,
+    "full_data_dir": DATA_PATH,
     "task_name": "sentiment_analysis",
     "no_cuda": True,
     "bert_model": "bert-base-uncased",
@@ -330,9 +330,9 @@ if __name__ == "__main__":
         pprint(eval_results, fp)
 
     def evaluate_model(model):
-        predict_processor = MultiLabelDataProcessor(DATA_BERT_PATH)
+        predict_processor = MultiLabelDataProcessor(DATA_PATH)
         test_filename = "test.csv"
-        test_examples = predict_processor.get_test_examples(DATA_BERT_PATH, test_filename)
+        test_examples = predict_processor.get_test_examples(DATA_PATH, test_filename)
 
         all_logits = None
         all_labels = None
