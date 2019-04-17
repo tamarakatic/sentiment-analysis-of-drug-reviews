@@ -65,18 +65,19 @@ def clean_review(sentence, dl):
             | replace_emoticons_with_tags
     else:
         return sentence \
-            | split_attached_words \
             | remove_repeating_vowels \
             | convert_text_to_lowercase \
             | remove_digits \
             | remove_punctuation \
-            | remove_stopwords_and_whitespaces \
             | remove_emails \
             | remove_urls \
             | handle_negations \
-            | replace_emoticons_with_tags \
-            | stem \
-            | lemmatize
+            | replace_emoticons_with_tags
+
+# | remove_stopwords_and_whitespaces \
+# | split_attached_words \
+# | stem \
+# | lemmatize
 
 
 @Pipe
