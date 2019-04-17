@@ -11,7 +11,10 @@ PRETRAINED_BERT_CACHE = os.path.join(ROOT_PATH, 'models/pretrain/uncased_L-12_H-
 
 PRETRAINED_ELMO = os.path.join(ROOT_PATH, 'models/pretrain/elmo/')
 PRETRAINED_BERT = os.path.join(ROOT_PATH, 'models/pretrain/bert/')
+
 PRETRAINED_FLAIR = os.path.join(ROOT_PATH, 'models/pretrain/flair/')
+FLAIR_LOSS = os.path.join(ROOT_PATH, 'models/pretrain/flair/loss.tsv')
+FLAIR_WEIGHTS = os.path.join(ROOT_PATH, 'models/pretrain/flair/weights.txt')
 
 DEV_PATH = os.path.join(ROOT_PATH, 'data/processed/dev.csv')
 TRAIN_PATH = os.path.join(ROOT_PATH, 'data/processed/train.csv')
