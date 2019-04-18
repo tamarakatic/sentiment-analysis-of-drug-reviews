@@ -47,10 +47,10 @@ if __name__ == "__main__":
 
     print("Dimension of all data: {}".format(df_all.shape))
 
-    df_all.iloc[:int(len(df_all) * 0.8)].to_csv(TRAIN_FLAIR_PATH,
-                                                encoding='utf-8', index=False, sep='\t', header=False)
+    df_all.iloc[:int(len(df_all) * 0.8)].to_csv(
+        TRAIN_FLAIR_PATH, encoding='utf-8', index=False, sep='\t', header=False)
     df_all.iloc[int(len(df_all) * 0.8):int(len(df_all) * 0.9)
                 ].to_csv(DEV_FLAIR_PATH, encoding='utf-8', index=False, sep='\t', header=False)
 
-    df_all.iloc[int(len(df_all) * 0.9):].to_csv(TEST_FLAIR_PATH,
-                                                encoding='utf-8', index=False, sep='\t', header=False)
+    df_all.iloc[int(len(df_all) * 0.9):].to_csv(
+        TEST_FLAIR_PATH, encoding='utf-8', index=False, sep='\t', header=False)

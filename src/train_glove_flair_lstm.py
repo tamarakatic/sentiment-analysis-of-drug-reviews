@@ -19,14 +19,14 @@ def main():
     label_dict = train_dev_corpus.make_label_dictionary()
 
     word_embeddings = [WordEmbeddings('glove'),
-                       FlairEmbeddings('news-forward-fast'),
-                       FlairEmbeddings('news-backward-fast')]
+                       FlairEmbeddings('news-forward-fast', chars_per_chunk=128),
+                       FlairEmbeddings('news-backward-fast', chars_per_chunk=128)]
 
     document_embeddings = DocumentRNNEmbeddings(word_embeddings,
                                                 rnn_type='LSTM',
-                                                hidden_size=512,
+                                                hidden_size=128,
                                                 reproject_words=True,
-                                                reproject_words_dimension=256)
+                                                reproject_words_dimension=64)
 
     classifier = TextClassifier(document_embeddings,
                                 label_dictionary=label_dict,
@@ -35,6 +35,9 @@ def main():
     trainer = ModelTrainer(classifier, train_dev_corpus)
     trainer.train(PRETRAINED_FLAIR,
                   max_epochs=10,
+                  learning_rate=0.1,
+                  mini_batch_size=32,
+                  embeddings_in_memory=False,
                   checkpoint=True)
 
     plotter = Plotter()
