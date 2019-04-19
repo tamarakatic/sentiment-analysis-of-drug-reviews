@@ -34,8 +34,8 @@ def main():
 
     trainer = ModelTrainer(classifier, train_dev_corpus)
     trainer.train(PRETRAINED_FLAIR,
-                  max_epochs=10,
-                  learning_rate=0.1,
+                  max_epochs=30,
+                  learning_rate=0.05,
                   mini_batch_size=32,
                   embeddings_in_memory=False,
                   checkpoint=True)
