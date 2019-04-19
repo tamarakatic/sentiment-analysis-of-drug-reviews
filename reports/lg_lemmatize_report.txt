@@ -1,0 +1,10 @@
+Report for Model: BoW + LR is
+	               precision    recall  f1-score   support
+
+    Negative       0.86      0.87      0.86     13497
+     Neutral       0.79      0.67      0.72     14076
+    Positive       0.86      0.92      0.88     26193
+
+   micro avg       0.84      0.84      0.84     53766
+   macro avg       0.83      0.82      0.82     53766
+weighted avg       0.84      0.84      0.84     53766
