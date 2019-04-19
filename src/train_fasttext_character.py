@@ -3,7 +3,7 @@ from pathlib import Path
 from data.definitions import DATA_PATH, PRETRAINED_FLAIR, FLAIR_LOSS, FLAIR_WEIGHTS
 
 from flair.data_fetcher import NLPTaskDataFetcher
-from flair.embeddings import WordEmbeddings, CharacterEmbeddings, DocumentRNNEmbeddings
+from flair.embeddings import WordEmbeddings, FlairEmbeddings, DocumentRNNEmbeddings
 from flair.models import TextClassifier
 from flair.trainers import ModelTrainer
 from flair.visual.training_curves import Plotter
@@ -18,8 +18,9 @@ def main():
 
     label_dict = train_dev_corpus.make_label_dictionary()
 
-    word_embeddings = [WordEmbeddings('glove'),
-                       CharacterEmbeddings()]
+    word_embeddings = [WordEmbeddings('crawl'),
+                       FlairEmbeddings('news-forward-fast', chars_per_chunk=128),
+                       FlairEmbeddings('news-backward-fast', chars_per_chunk=128)]
 
     document_embeddings = DocumentRNNEmbeddings(word_embeddings,
                                                 rnn_type='LSTM',
