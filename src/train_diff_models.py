@@ -55,14 +55,14 @@ def bag_of_words_pipeline():
     # tune: max_depth, min_child_weight, n_estimatorss
     xgb = pipelines.bag_of_words(
         classifier=XGBClassifier(
-            learning_rate=0.2, n_estimators=1000, max_depth=5, objective='multi:softprob',
-            n_class=3, n_jobs=-1, random_state=0)
+            learning_rate=0.2, n_estimators=1000, max_depth=7, objective='multi:softprob',
+            n_class=3, n_jobs=-1, random_state=0, min_child_weight=3)
     )
 
     xgb_tfidf = pipelines.bag_of_words(
         classifier=XGBClassifier(
-            learning_rate=0.2, n_estimators=1000, max_depth=5, objective='multi:softprob',
-            n_class=3, n_jobs=-1, random_state=0),
+            learning_rate=0.2, n_estimators=1000, max_depth=7, objective='multi:softprob',
+            n_class=3, n_jobs=-1, random_state=0, min_child_weight=3),
         tf_idf=True
     )
 
