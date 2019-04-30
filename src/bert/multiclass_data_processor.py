@@ -22,18 +22,17 @@ class MultiClassDataProcessor(DataProcessor):
         return self._create_examples(df_test)
 
     def get_labels(self):
-        if self.labels is None:
-            self.labels = [0, 1, 2]
-        return self.labels
+        labels = [0, 1, 2]
+        return labels
 
     def _create_examples(self, df):
         examples = []
-        for (i, row) in enumerate(df):
+        for (i, row) in df.iterrows():
             if i == 0:
                 continue
-            guid = row[0]
-            text_a = row[3]
-            labels = row[4]
+            guid = row["Index"]
+            text_a = row["review"]
+            labels = row["rating"]
 
             examples.append(InputExample(guid=guid, text_a=text_a, labels=labels))
 
