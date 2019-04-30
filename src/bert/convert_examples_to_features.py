@@ -6,13 +6,13 @@ logger = logging.getLogger(__name__)
 
 
 def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer):
-    label_map = {label: i for i, label in enumerate(label_list)}
+    # label_map = {label: i for i, label in enumerate(label_list)}
 
     features = []
     classifier = "[CLS]"
     separator = "[SEP]"
 
-    for (idx, example) in enumerate(examples):
+    for (idx, example) in examples.iterrows():
         tokens_a = tokenizer.tokenize(example.text_a)
 
         if len(tokens_a) > (max_seq_length - 2):  # -2 for [CLS] and [SEP]
@@ -32,7 +32,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         segment_ids += padding
 
         # label_ids = [0.0 if idx != example.labels else 1.0 for idx in range(nclasses)]
-        label_id = label_map[example.labels]
+        label_id = example.labels
 
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
@@ -46,7 +46,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
             logger.info("input_ids: %s", (" ".join([str(x) for x in input_ids])))
             logger.info("input_mask: %s", (" ".join([str(x) for x in input_mask])))
             logger.info("segment_ids: %s", (" ".join([str(x) for x in segment_ids])))
-            logger.info("label: %s (id = %d)".format(example.label, label_id))
+            logger.info("label: %d".format(example.labels, label_id))
 
         features.append(InputFeatures(input_ids, input_mask, segment_ids, label_id))
 
