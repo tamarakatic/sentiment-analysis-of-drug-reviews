@@ -1,58 +1,51 @@
 import os
-from pprint import pprint
 import numpy as np
 import random
-from tqdm import tqdm
+from tqdm import tqdm, trange
+import logging
 
-from sklearn.metrics import roc_curve, auc, f1_score
+from sklearn.metrics import f1_score
 
-from data.definitions import DATA_PATH
-from data.definitions import DATA_BERT, OUTPUT_BERT_DIR, PRETRAINED_BERT_CACHE
+from data.definitions import TRAIN_PATH, TEST_PATH, DEV_PATH
+from data.definitions import OUTPUT_BERT_DIR, BERT_PRETRAINED_PATH
 
-from bert.multilabel_data_processor import MultiLabelDataProcessor
-from bert.cyclic_learning_rate import CyclicLR
-from bert.input_examples_to_features import convert_examples_to_features
-from bert.multilabel_bert_model import BertForMultiLabelSequenceClassification
+from bert.multiclass_data_processor import MultiClassDataProcessor
+from bert.convert_examples_to_features import convert_examples_to_features
 
 import torch
-from torch import Tensor
 from torch.utils.data import TensorDataset, RandomSampler, DataLoader, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+from torch.nn import CrossEntropyLoss
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
+from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from pytorch_pretrained_bert.optimization import BertAdam
+from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 
 model_state_dict = None
-
+logger = logging.getLogger(__name__)
 
 args = {
-    "data_dir": DATA_BERT,
-    "full_data_dir": DATA_PATH,
-    "task_name": "sentiment_analysis",
     "no_cuda": True,
     "bert_model": "bert-base-uncased",
     "output_dir": OUTPUT_BERT_DIR,
+    "cache_dir": BERT_PRETRAINED_PATH,
     "max_seq_length": 128,
     "do_train": True,
     "do_eval": True,
+    "do_test": True,
     "do_lower_case": True,
     "train_batch_size": 32,
     "eval_batch_size": 32,
-    "learning_rate": 3e-5,
-    "num_train_epochs": 4.0,
+    "test_batch_size": 32,
+    "learning_rate": 5e-5,
+    "num_train_epochs": 10.0,
     "warmup_proportion": 0.1,
     "local_rank": -1,
     "seed": 42,
-    "gradient_accumulation_steps": 1,
-    "optimize_on_cpu": False,
-    "fp16": False,
-    "loss_scale": 128
+    "gradient_accumulation_steps": 1
 }
 
-
-processors = {
-    "sentiment_analysis": MultiLabelDataProcessor
-}
 
 if __name__ == "__main__":
     if args["local_rank"] == -1 or args["no_cuda"]:
@@ -65,7 +58,12 @@ if __name__ == "__main__":
         n_gpu = 1
         torch.distributed.init_process_group(backend="nccl")
 
-    args["train_batch_size"] = int(args["train_batch_size"] / args["gradient_accumulation_steps"])
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+                        datefmt='%m/%d/%Y %H:%M:%S',
+                        level=logging.INFO if args["local_rank"] in [-1, 0] else logging.WARN)
+
+    logger.info("device: {} n_gpu: {}, distributed training: {}".format(
+        device, n_gpu, bool(args["local_rank"] != -1)))
 
     random.seed(args["seed"])
     np.random.seed(args["seed"])
@@ -74,12 +72,9 @@ if __name__ == "__main__":
     if n_gpu > 0:
         torch.cuda.manual_seed_all(args["seed"])
 
-    task_name = args["task_name"].lower()
-    if task_name not in processors:
-        raise ValueError("Task {} not found!".format(task_name))
-
-    processor = processors[task_name](args["data_dir"])
+    processor = MultiClassDataProcessor()
     label_list = processor.get_labels()
+    print("Labels: {}".format(label_list))
     num_labels = len(label_list)
 
     tokenizer = BertTokenizer.from_pretrained(
@@ -89,25 +84,19 @@ if __name__ == "__main__":
     num_train_steps = None
 
     if args["do_train"]:
-        train_examples = processor.get_train_examples(args["full_data_dir"])
+        train_examples = processor.get_train_examples(TRAIN_PATH)
         num_train_steps = int(len(train_examples) / args["train_batch_size"] /
-                              args["gradient_accumulation_steps"] * args["num_train_epochs"])
+                              args["gradient_accumulation_steps"]) * args["num_train_epochs"]
+
+        if args["local_rank"] != -1:
+            num_train_steps = num_train_steps // torch.distributed.get_world_size()
 
     # prepare model
-    def get_model():
-        if model_state_dict:
-            model = BertForMultiLabelSequenceClassification.from_pretrained(
-                args["bert_model"], num_labels=num_labels, state_dict=model_state_dict)
-        else:
-            model = BertForMultiLabelSequenceClassification.from_pretrained(
-                args["bert_model"], num_labels=num_labels)
-        return model
-
-    model = get_model()
-
-    if args["fp16"]:
-        model.half()
-
+    cache_dir = args["cache_dir"] if args["cache_dir"] else os.path.join(
+        str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args["local_rank"]))
+    model = BertForSequenceClassification.from_pretrained(args["bert_model"],
+                                                          cache_dir=cache_dir,
+                                                          num_labels=num_labels)
     model.to(device)
 
     if args["local_rank"] != -1:
@@ -132,276 +121,213 @@ if __name__ == "__main__":
          "weight_decay": 0.0}
     ]
 
-    t_total = num_train_steps
-    if args["local_rank"] != -1:
-        t_total = t_total // torch.distributed.get_world_size()
+    optimizer = BertAdam(optimizer_group_parameters,
+                         lr=args["learning_rate"],
+                         warmup=args["warmup_proportion"],
+                         t_total=num_train_steps)
 
-    if args["fp16"]:
-        try:
-            from apex.optimizers import FP16_Optimizer
-            from apex.optimizers import FusedAdam
-        except ImportError:
-            raise ImportError(
-                "Please install apex from https://www.github.com/nvidia/apex to use distributed and \
-                fp16 training.")
+    global_step = 0
+    nb_tr_steps = 0
+    tr_loss = 0
 
-        optimizer = FusedAdam(optimizer_group_parameters,
-                              lr=args["learning_rate"],
-                              bias_correction=False,
-                              max_grad_norm=1.0)
+    if args["do_train"]:
+        train_features = convert_examples_to_features(
+            train_examples, label_list, args["max_seq_length"], tokenizer)
+        logger.info("******** Running training ********")
+        logger.info("  Number of examples = %d", len(train_examples))
+        logger.info("  Batch size = %d", args["train_batch_size"])
+        logger.info("  Num steps = %d", num_train_steps)
 
-        if args["loss_scale"] == 0:
-            optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
+        train_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
+        train_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
+        train_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+        train_label_ids = torch.tensor([f.label_ids for f in train_features], dtype=torch.long)
+
+        train_data = TensorDataset(train_input_ids, train_input_mask,
+                                   train_segment_ids, train_label_ids)
+
+        if args["local_rank"] == -1:
+            train_sampler = RandomSampler(train_data)
         else:
-            optimizer = FP16_Optimizer(optimizer, static_loss_scale=args["loss_scale"])
-    else:
-        optimizer = BertAdam(optimizer_group_parameters,
-                             lr=args["learning_rate"],
-                             warmup=args["warmup_proportion"],
-                             t_total=t_total)
+            train_sampler = DistributedSampler(train_data)
 
-    scheduler = CyclicLR(optimizer, base_lr=2e-5, max_lr=5e-5,
-                         step_size=2500, last_batch_iteration=0)
+        train_dataloader = DataLoader(train_data, sampler=train_sampler,
+                                      batch_size=args["train_batch_size"])
 
-    eval_examples = processor.get_dev_examples(args["data_dir"])
-
-    def eval():
-        eval_features = convert_examples_to_features(
-            eval_examples, args["max_seq_length"], tokenizer)
-
-        all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
-        all_label_ids = torch.tensor([f.label_ids for f in eval_features], dtype=torch.float)
-
-        eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-        eval_sampler = SequentialSampler(eval_data)
-        eval_dataloader = DataLoader(eval_data, sampler=eval_sampler,
-                                     batch_size=args["eval_batch_size"])
-
-        all_logits = None
-        all_labels = None
-
-        model.eval()
-        eval_loss, eval_accuracy = 0, 0
-        nb_eval_steps, nb_eval_examples = 0, 0
-
-        for input_ids, input_mask, segment_ids, label_ids in eval_dataloader:
-            input_ids = input_ids.to(device)
-            input_mask = input_mask.to(device)
-            segment_ids = segment_ids.to(device)
-            label_ids = label_ids.to(device)
-
-            with torch.no_grad():
-                tmp_eval_loss = model(input_ids, segment_ids, input_mask, label_ids)
-
-                logits = model(input_ids, segment_ids, input_mask)
-
-            tmp_eval_accuracy = accuracy_thresh(logits, label_ids)
-
-            if all_logits is None:
-                all_logits = logits.detach().cpu().numpy()
-            else:
-                all_logits = np.concatenate((all_logits, logits.detach().cpu().numpy()), axis=0)
-
-            if all_labels is None:
-                all_labels = label_ids.detach().cpu().numpy()
-            else:
-                all_labels = np.concatenate((all_labels, label_ids.detach().cpu().numpy()), axis=0)
-
-            eval_loss += tmp_eval_loss.mean().item()
-            eval_accuracy += tmp_eval_accuracy
-
-            nb_eval_examples += input_ids.size(0)
-            nb_eval_steps += 1
-
-        eval_loss = eval_loss / nb_eval_steps
-        eval_accuracy = eval_accuracy / nb_eval_examples
-
-        fpr = dict()
-        tpr = dict()
-        roc_auc = dict()
-
-        for i in range(num_labels):
-            fpr[i], tpr[i], _ = roc_curve(all_labels[:, i], all_logits[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-
-        # Compute micro-average ROC curve and ROC area
-        fpr["micro"], tpr["micro"], _ = roc_curve(all_labels.ravel(), all_logits.ravel())
-        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-
-        result = {'eval_loss': eval_loss,
-                  'eval_accuracy': eval_accuracy,
-                  'roc_auc': roc_auc}
-
-        return result
-
-    trian_features = convert_examples_to_features(
-        train_examples, args["max_seq_length"], tokenizer)
-
-    all_input_ids = torch.tensor([f.input_ids for f in trian_features], dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in trian_features], dtype=torch.long)
-    all_segment_ids = torch.tensor([f.segment_ids for f in trian_features], dtype=torch.long)
-    all_label_ids = torch.tensor([f.label_ids for f in trian_features], dtype=torch.float)
-
-    train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-
-    if args["local_rank"] == -1:
-        train_sampler = RandomSampler(train_data)
-    else:
-        train_sampler = DistributedSampler(train_data)
-
-    train_dataloader = DataLoader(train_data,
-                                  sampler=train_sampler,
-                                  batch_size=args["train_batch_size"])
-
-    def warmup_linear(x, warmup=0.002):
-        if x < warmup:
-            return x / warmup
-        return 1.0 - x
-
-    def accuracy_thresh(y_pred: Tensor, y_true: Tensor, thresh: float=0.5, sigmoid: bool=True):
-        "Compute accuracy when `y_pred` and `y_true` are the same size."
-        if sigmoid:
-            y_pred = y_pred.sigmoid()
-        return np.mean(((y_pred > thresh) == y_true.byte()).float().cpu().numpy(), axis=1).sum()
-
-    def fit():
-        num_epochs = args["num_train_epochs"]
-        global_step = 0
         model.train()
 
-        for i_ in range(int(num_epochs)):
-            print("\nEpoch: {}".format(i_))
-
+        for _ in trange(int(args["num_train_epochs"]), desc="Epoch"):
             tr_loss = 0
-            nb_train_examples = 0
-            nb_train_steps = 0
+            nb_tr_examples, nb_tr_steps = 0, 0
 
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, segment_ids, label_ids = batch
-                loss = model(input_ids, segment_ids, input_mask, label_ids)
+
+                logits = model(input_ids, segment_ids, input_mask, labels=None)
+
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
 
                 if n_gpu > 1:
                     loss = loss.mean()
                 if args["gradient_accumulation_steps"] > 1:
                     loss = loss / args["gradient_accumulation_steps"]
 
-                if args["fp16"]:
-                    optimizer.backward(loss)
-                else:
-                    loss.backward()
+                loss.backward()
 
                 tr_loss += loss.item()
-                nb_train_examples += input_ids.size(0)
-                nb_train_steps += 1
+                nb_tr_examples += input_ids.size(0)
+                nb_tr_steps += 1
 
-                # modify learning rate
                 if (step + 1) % args["gradient_accumulation_steps"] == 0:
-                    lr_this_step = args["learning_rate"] * \
-                        warmup_linear(global_step / t_total, args["warmup_proportion"])
-
-                    for param_group in optimizer.param_groups:
-                        param_group["lr"] = lr_this_step
-
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
 
-            eval_results = eval()
-            pprint(eval_results)
+    if args["do_train"] and (args["local_rank"] == -1 or torch.distributed.get_rank() == 0):
+        model_to_save = model.module if hasattr(model, 'module') else model
 
-    model.unfreeze_bert_encoder()
+        output_model_file = os.path.join(args["output_dir"], "pytorch_model.bin")
+        output_config_file = os.path.join(args["output_dir"], "bert_config.json")
 
-    fit()
+        torch.save(model_to_save.state_dict(), output_model_file)
+        model_to_save.config.to_json_file(output_config_file)
+        tokenizer.save_vocabulary(args["output_dir"])
 
-    model_to_save = model.module if hasattr(model, "module") else model
-    output_model_file = os.path.join(PRETRAINED_BERT_CACHE, "finetuned_pytorch_model.bin")
-    torch.save(model_to_save.state_dict(), output_model_file)
+        model_state_dict = model_to_save.load_state_dict(torch.load(output_model_file))
+        # Load a trained fine-tunes model and vocabulary
+        model = BertForSequenceClassification.from_pretrained(
+            args["output_dir"], num_labels=num_labels, state_dict=model_state_dict)
+        tokenizer = BertTokenizer.from_pretrained(
+            args["output_dir"], do_lower_case=args["do_lower_case"])
 
-    model_state_dict = torch.load(output_model_file)
-    model = BertForMultiLabelSequenceClassification.from_pretrained(
-        args["bert_model"], num_labels=num_labels, state_dict=model_state_dict)
+    else:
+        model = BertForSequenceClassification.from_pretrained(
+            args["bert_model"], num_labels=num_labels)
+
     model.to(device)
 
-    eval_results = eval()
-    with open("reports/bert_train_eval.txt", "w") as fp:
-        pprint(eval_results, fp)
+    if args["do_eval"] and (args["local_rank"] == -1 or torch.distributed.get_rank() == 0):
+        eval_examples = processor.get_dev_examples(DEV_PATH)
+        eval_features = convert_examples_to_features(
+            eval_examples, label_list, args["max_seq_length"], tokenizer)
 
-    def evaluate_model(model):
-        predict_processor = MultiLabelDataProcessor(DATA_PATH)
-        test_filename = "test.csv"
-        test_examples = predict_processor.get_test_examples(DATA_PATH, test_filename)
+        logger.info("******** Running evaluation ********")
+        logger.info(" Num examples = %d", len(eval_examples))
+        logger.info(" Batch size = %d", args["eval_batch_size"])
 
-        all_logits = None
-        all_labels = None
+        eval_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
+        eval_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
+        eval_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
+        eval_label_ids = torch.tensor([f.label_ids for f in eval_features], dtype=torch.long)
 
-        test_features = convert_examples_to_features(
-            test_examples, args['max_seq_length'], tokenizer)
+        eval_data = TensorDataset(eval_input_ids, eval_input_mask, eval_segment_ids, eval_label_ids)
 
-        all_input_ids = torch.tensor([f.input_ids for f in test_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in test_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in test_features], dtype=torch.long)
-        all_label_ids = torch.tensor([f.label_ids for f in test_features], dtype=torch.float)
-
-        test_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-        test_sampler = SequentialSampler(test_data)
-        test_dataloader = DataLoader(test_data,
-                                     sampler=test_sampler,
+        eval_sampler = SequentialSampler(eval_data)
+        eval_dataloader = DataLoader(eval_data, sampler=eval_sampler,
                                      batch_size=args["eval_batch_size"])
+
         model.eval()
 
+        eval_loss = 0
         nb_eval_steps = 0
-        nb_eval_examples = 0
+        preds = []
 
-        for step, batch in enumerate(tqdm(test_dataloader, desc="Prediction Iteration")):
-            input_ids, input_mask, segment_ids, label_ids = batch
+        for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
             segment_ids = segment_ids.to(device)
             label_ids = label_ids.to(device)
 
             with torch.no_grad():
-                logits = model(input_ids, segment_ids, input_mask)
-                logits = logits.sigmoid()
+                logits = model(input_ids, segment_ids, input_mask, labels=None)
 
-            if all_logits is None:
-                all_logits = logits.detach().cpu().numpy()
-            else:
-                all_logits = np.concatenate((all_logits, logits.detach().cpu().numpy()), axis=0)
+            tmp_eval_loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
 
-            if all_labels is None:
-                all_labels = label_ids.detach().cpu().numpy()
-            else:
-                all_labels = np.concatenate((all_labels, label_ids.detach().cpu().numpy()), axis=0)
-
-            nb_eval_examples += input_ids.size(0)
+            eval_loss += tmp_eval_loss.mean().item()
             nb_eval_steps += 1
 
-        fpr = dict()
-        tpr = dict()
-        roc_auc = dict()
+            if len(preds) == 0:
+                preds.append(logits.detach().cpu().numpy())
+            else:
+                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
 
-        for i in range(num_labels):
-            fpr[i], tpr[i], _ = roc_curve(all_labels[:, i], all_logits[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
+        eval_loss = eval_loss / nb_eval_steps
+        preds = preds[0]
 
-        # Compute micro-average ROC curve and ROC area
-        fpr["micro"], tpr["micro"], _ = roc_curve(all_labels.ravel(), all_logits.ravel())
-        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+        preds = np.argmax(preds, axis=1)
 
-        f1 = {}
-        for average in ["micro", "macro", "weighted"]:
-            f1[average] = f1_score(all_labels.argmax(axis=1),
-                                   all_logits.argmax(axis=1),
-                                   average=average)
+        eval_result = {}
+        eval_result["micro"] = f1_score(y_true=eval_label_ids.numpy(),
+                                        y_pred=preds, average="micro")
+        loss = tr_loss / nb_tr_steps if args["do_train"] else None
 
-        result = {'roc_auc': roc_auc, 'f1': f1}
-        return result
+        eval_result["eval_loss"] = eval_loss
+        eval_result["global_step"] = global_step
+        eval_result["loss"] = loss
 
-    final_results = evaluate_model(model)
-    print('\n\nFinal Results:\n')
-    pprint(final_results)
-    with open("reports/bert_final_results.txt", "w") as fp:
-        pprint(final_results, fp)
+        with open("../reports/new_bert_eval_results.txt", "w") as fp:
+            logger.info("******** Eval results ********")
+            for key in sorted(eval_result.keys()):
+                logger.info(" %s = %s", key, str(eval_result[key]))
+                fp.write("%s = %s\n" % (key, str(eval_result[key])))
+
+    if args["do_test"] and (args["local_rank"] == -1 or torch.distributed.get_rank() == 0):
+        test_examples = processor.get_test_examples(TEST_PATH)
+        test_features = convert_examples_to_features(
+            test_examples, label_list, args['max_seq_length'], tokenizer)
+
+        logger.info("******** Running test ********")
+        logger.info(" Num examples = %d", len(test_examples))
+
+        test_input_ids = torch.tensor([f.input_ids for f in test_features], dtype=torch.long)
+        test_input_mask = torch.tensor([f.input_mask for f in test_features], dtype=torch.long)
+        test_segment_ids = torch.tensor([f.segment_ids for f in test_features], dtype=torch.long)
+        test_label_ids = torch.tensor([f.label_ids for f in test_features], dtype=torch.long)
+
+        test_data = TensorDataset(test_input_ids, test_input_mask, test_segment_ids, test_label_ids)
+        test_sampler = SequentialSampler(test_data)
+        test_dataloader = DataLoader(test_data,
+                                     sampler=test_sampler,
+                                     batch_size=args["test_batch_size"])
+
+        test_loss = 0
+        nb_test_steps = 0
+        test_preds = []
+
+        for input_ids, input_mask, segment_ids, label_ids in tqdm(test_dataloader, desc="Prediction Iteration"):
+            input_ids = input_ids.to(device)
+            input_mask = input_mask.to(device)
+            segment_ids = segment_ids.to(device)
+            label_ids = label_ids.to(device)
+
+            with torch.no_grad():
+                logits = model(input_ids, segment_ids, input_mask, labels=None)
+
+            tmp_test_loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
+
+            test_loss += tmp_test_loss.mean().item()
+            nb_test_steps += 1
+            if len(test_preds) == 0:
+                test_preds.append(logits.detach().cpu().numpy())
+            else:
+                test_preds[0] = np.append(test_preds[0], logits.detach().cpu().numpy(), axis=0)
+
+        test_loss = test_loss / nb_test_steps
+        test_preds = test_preds[0]
+        test_preds = np.argmax(test_preds, axis=1)
+
+        test_result = {}
+        test_result["micro"] = f1_score(y_true=test_label_ids.numpy(),
+                                        y_pred=test_preds, average="micro")
+
+        test_result["test_loss"] = test_loss
+        test_result["global_step"] = global_step
+        test_result["loss"] = loss
+
+        with open("../reports/new_bert_test_results.txt", "w") as fp:
+            logger.info("******** Test results ********")
+            for key in sorted(test_result.keys()):
+                logger.info(" %s = %s", key, str(test_result[key]))
+                fp.write("%s = %s\n" % (key, str(test_result[key])))
