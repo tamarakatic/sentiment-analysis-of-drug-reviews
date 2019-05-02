@@ -22,7 +22,7 @@ class BaseModel(Model):
         self.encoder = encoder
         self.linear = torch.nn.Linear(in_features=self.encoder.get_output_dim(),
                                       out_features=output)
-        self.loss = torch.nn.BCEWithLogitsLoss()
+        self.loss = torch.nn.CrossEntropyLoss()
 
     def forward(self,
                 tokens: Dict[str, torch.Tensor],
