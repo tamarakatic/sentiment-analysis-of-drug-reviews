@@ -1,9 +1,8 @@
 import pandas as pd
-import numpy as np
 from typing import Callable, List, Dict, Optional, Iterator
 
 
-from allennlp.data.fields import TextField, ArrayField, MetadataField
+from allennlp.data.fields import TextField, LabelField, MetadataField
 from allennlp.data.dataset_readers import DatasetReader
 from allennlp.data.token_indexers.single_id_token_indexer import SingleIdTokenIndexer
 from allennlp.data.token_indexers import TokenIndexer
@@ -29,7 +28,7 @@ class TransferLearnDatasetReader(DatasetReader):
     def text_to_instance(self,
                          tokens: List[Token],
                          idx: int=None,
-                         label: np.ndarray=None,
+                         label: int=None,
                          nclasses: int=None) -> Instance:
         sentence_field = TextField(tokens, self.token_indexers)
         fields = {"tokens": sentence_field}
@@ -37,8 +36,8 @@ class TransferLearnDatasetReader(DatasetReader):
         id_field = MetadataField(idx)
         fields["id"] = id_field
 
-        label_field = np.array([0 if label != idx else 1 for idx in range(nclasses)])
-        fields["label"] = ArrayField(array=label_field)
+        # label_field = np.array([0 if label != idx else 1 for idx in range(nclasses)])
+        fields["label"] = LabelField(label, skip_indexing=True)
 
         return Instance(fields)
 
@@ -48,7 +47,7 @@ class TransferLearnDatasetReader(DatasetReader):
 
         for (i, row) in df.iterrows():
             yield self.text_to_instance(
-                [Token(x) for x in self.tokenizer(row["review_cond"])],
+                [Token(x) for x in self.tokenizer(row["review"])],
                 row["Index"],
                 row["rating"],
                 len(CLASSES)

@@ -27,7 +27,7 @@ class BaseModel(Model):
     def forward(self,
                 tokens: Dict[str, torch.Tensor],
                 id: Any,
-                label: torch.Tensor) -> torch.Tensor:
+                label: torch.LongTensor) -> torch.Tensor:
         mask = get_text_field_mask(tokens)
         embeddings = self.word_embeddings(tokens)
         encoder_out = self.encoder(embeddings, mask)
