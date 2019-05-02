@@ -58,7 +58,7 @@ if __name__ == '__main__':
     predictor = ClassifierPredictor(model, basic_iterator, cuda_device=cuda_device)
     eval_results = predictor.evaluate(test_dataset)
 
-    y_true = [row['label'].array.argmax() for row in test_dataset]
+    y_true = [row['label'].label for row in test_dataset]
     y_pred = eval_results.argmax(axis=1).tolist()
 
     f1_report = defaultdict(list)
