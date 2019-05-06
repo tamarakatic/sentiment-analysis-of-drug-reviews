@@ -7,7 +7,7 @@ DATA_PATH = os.path.join(ROOT_PATH, 'data/processed/')
 DATA_BERT = os.path.join(ROOT_PATH, 'data/processed/tmp')
 
 BERT_PRETRAINED_PATH = os.path.join(ROOT_PATH, 'models/pretrain/uncased_L-12_H-768_A-12/')
-OUTPUT_BERT_DIR = os.path.join(ROOT_PATH, 'models/pretrain/uncased_L-12_H-768_A-12/output/')
+OUTPUT_BERT_DIR = os.path.join(ROOT_PATH, 'models/pretrain/uncased_L-12_H-768_A-12/cache/')
 
 PRETRAINED_ELMO = os.path.join(ROOT_PATH, 'models/pretrain/elmo/')
 PRETRAINED_BERT = os.path.join(ROOT_PATH, 'models/pretrain/bert/')
