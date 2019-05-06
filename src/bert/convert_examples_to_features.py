@@ -12,7 +12,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     classifier = "[CLS]"
     separator = "[SEP]"
 
-    for (idx, example) in examples.iterrows():
+    for (idx, example) in enumerate(examples):
         tokens_a = tokenizer.tokenize(example.text_a)
 
         if len(tokens_a) > (max_seq_length - 2):  # -2 for [CLS] and [SEP]
