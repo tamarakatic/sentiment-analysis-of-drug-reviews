@@ -20,6 +20,7 @@ from torch.nn import CrossEntropyLoss
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from pytorch_pretrained_bert.optimization import BertAdam
+from pytorch_lamb import Lamb
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 
 model_state_dict = None
@@ -30,20 +31,21 @@ args = {
     "bert_model": "bert-base-uncased",
     "output_dir": OUTPUT_BERT_DIR,
     "cache_dir": BERT_PRETRAINED_PATH,
-    "max_seq_length": 128,
+    "max_seq_length": 256,
     "do_train": True,
     "do_eval": True,
     "do_test": True,
     "do_lower_case": True,
     "train_batch_size": 32,
-    "eval_batch_size": 32,
-    "test_batch_size": 32,
-    "learning_rate": 5e-5,
-    "num_train_epochs": 10.0,
-    "warmup_proportion": 0.1,
+    "eval_batch_size": 64,
+    "test_batch_size": 64,
+    "learning_rate": 0.0025,
+    "num_train_epochs": 5,
+    "warmup_proportion": 0.01,
     "local_rank": -1,
     "seed": 42,
-    "gradient_accumulation_steps": 1
+    "gradient_accumulation_steps": 1,
+    "adam": False
 }
 
 
@@ -121,10 +123,15 @@ if __name__ == "__main__":
          "weight_decay": 0.0}
     ]
 
-    optimizer = BertAdam(optimizer_group_parameters,
+    if args["adam"]:
+        optimizer = BertAdam(optimizer_group_parameters,
+                             lr=args["learning_rate"],
+                             warmup=args["warmup_proportion"],
+                             t_total=num_train_steps)
+    else:
+        optimizer = Lamb(optimizer_group_parameters,
                          lr=args["learning_rate"],
-                         warmup=args["warmup_proportion"],
-                         t_total=num_train_steps)
+                         weight_decay=args["warmup_proportion"])
 
     global_step = 0
     nb_tr_steps = 0
@@ -184,6 +191,8 @@ if __name__ == "__main__":
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
+
+            print("********* Train Loss : {}".format(tr_loss / nb_tr_steps))
 
     if args["do_train"] and (args["local_rank"] == -1 or torch.distributed.get_rank() == 0):
         model_to_save = model.module if hasattr(model, 'module') else model
@@ -253,6 +262,8 @@ if __name__ == "__main__":
             else:
                 preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
 
+            print("********* Eval Loss : {}".format(eval_loss / nb_eval_steps))
+
         eval_loss = eval_loss / nb_eval_steps
         preds = preds[0]
 
@@ -313,6 +324,8 @@ if __name__ == "__main__":
                 test_preds.append(logits.detach().cpu().numpy())
             else:
                 test_preds[0] = np.append(test_preds[0], logits.detach().cpu().numpy(), axis=0)
+
+            print("********* Test Loss : {}".format(test_loss / nb_test_steps))
 
         test_loss = test_loss / nb_test_steps
         test_preds = test_preds[0]
